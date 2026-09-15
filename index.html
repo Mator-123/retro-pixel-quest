@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Retro Pixel Quest</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --ink: #27243d;
+            --coral: #ef5262;
+            --gold: #f5c451;
+            --cream: #fff6db;
+            --teal: #62c8d8;
+            --purple: #633c83;
+        }
+        * { box-sizing: border-box; }
+        .start-menu {
+            position: fixed;
+            inset: 0;
+            z-index: 10;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #fff;
+            color: #27243d;
+        }
+        .start-menu.hidden { display: none; }
+        .start-menu-panel {
+            width: min(92%, 620px);
+            padding: 42px 28px;
+            border: 5px solid #27243d;
+            text-align: center;
+            box-shadow: 10px 10px 0 #633c83;
+        }
+        .start-menu h1 {
+            margin: 0 0 32px;
+            font: 28px 'Press Start 2P', monospace;
+            line-height: 1.5;
+        }
+        .start-menu button,
+        .start-menu select {
+            display: block;
+            width: 100%;
+            margin: 14px 0;
+            padding: 16px;
+            border: 4px solid #27243d;
+            background: #f5c451;
+            color: #27243d;
+            cursor: pointer;
+            font: 13px 'Press Start 2P', monospace;
+        }
+        .start-menu select {
+            background: #fff6db;
+        }
+        body {
+            min-height: 100vh;
+            margin: 0;
+            color: var(--ink);
+            background: #f8e5b8;
+            font-family: 'Space Grotesk', sans-serif;
+            overflow-x: hidden;
+        }
+        body::before {
+            position: fixed;
+            inset: 0;
+            z-index: -1;
+            content: '';
+            background: linear-gradient(150deg, rgba(255, 246, 219, 0.72), transparent 48%), repeating-linear-gradient(0deg, rgba(39, 36, 61, 0.035) 0 1px, transparent 1px 5px);
+            pointer-events: none;
+        }
+        .page {
+            width: 100%;
+            min-height: 100vh;
+        }
+        .game-frame {
+            width: 100%;
+            height: 100vh;
+            padding: 12px;
+            border: 4px solid var(--coral);
+            border-top-width: 4px;
+            border-bottom-width: 4px;
+            box-shadow: none;
+        }
+        .game-frame {
+            background: var(--ink);
+            display: flex;
+            flex-direction: column;
+        }
+        .hud {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            padding: 12px 14px;
+            background: var(--cream);
+            color: var(--ink);
+            font: 12px 'Press Start 2P', monospace;
+            line-height: 1.7;
+        }
+        .hud-group { display: flex; gap: 24px; flex-wrap: wrap; }
+        .hud strong { color: var(--coral); }
+        .exit-button {
+            padding: 7px 10px;
+            border: 2px solid var(--ink);
+            background: var(--cream);
+            color: var(--ink);
+            cursor: pointer;
+            font: 10px 'Press Start 2P', monospace;
+        }
+        .screen {
+            position: relative;
+            overflow: hidden;
+            background: var(--teal);
+            flex: 1;
+            min-height: 0;
+        }
+        canvas { display: block; width: 100%; height: 100%; image-rendering: pixelated; }
+        .message {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            display: none;
+            width: min(90%, 620px);
+            padding: 22px;
+            transform: translate(-50%, -50%);
+            background: var(--cream);
+            border: 4px solid var(--coral);
+            color: var(--ink);
+            font: 15px 'Press Start 2P', monospace;
+            line-height: 1.8;
+            text-align: center;
+            box-shadow: 7px 7px 0 var(--purple);
+        }
+        .message.visible { display: block; }
+        .math-panel {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            display: none;
+            width: min(90%, 520px);
+            padding: 26px;
+            transform: translate(-50%, -50%);
+            background: #fff6db;
+            border: 4px solid #27243d;
+            color: #27243d;
+            text-align: center;
+            box-shadow: 8px 8px 0 #633c83;
+            z-index: 2;
+        }
+        .math-panel.visible { display: block; }
+        .math-panel h2 {
+            margin: 0 0 18px;
+            font: 16px 'Press Start 2P', monospace;
+        }
+        .math-question {
+            margin: 12px 0 20px;
+            color: #ef5262;
+            font: 24px 'Press Start 2P', monospace;
+        }
+        .math-panel input {
+            width: 100%;
+            padding: 12px;
+            border: 3px solid #633c83;
+            color: #27243d;
+            background: #fff;
+            font: 18px 'Space Grotesk', sans-serif;
+            text-align: center;
+        }
+        .math-panel button {
+            margin-top: 14px;
+            padding: 12px 18px;
+            border: 3px solid #27243d;
+            background: #f5c451;
+            color: #27243d;
+            cursor: pointer;
+            font: 12px 'Press Start 2P', monospace;
+        }
+        .success-fade {
+            position: absolute;
+            inset: 0;
+            display: none;
+            background: #fff;
+            opacity: 0;
+            z-index: 3;
+        }
+        .success-fade.visible { display: block; }
+        .success-panel {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            display: none;
+            width: min(90%, 620px);
+            padding: 34px 26px;
+            transform: translate(-50%, -50%);
+            background: #fff;
+            border: 5px solid #27243d;
+            color: #27243d;
+            text-align: center;
+            box-shadow: 9px 9px 0 #633c83;
+            z-index: 4;
+        }
+        .success-panel.visible { display: block; }
+        .success-panel h2 {
+            margin: 0 0 26px;
+            font: 20px 'Press Start 2P', monospace;
+            line-height: 1.6;
+        }
+        .success-panel button {
+            display: block;
+            width: 100%;
+            padding: 15px;
+            border: 4px solid #27243d;
+            background: #f5c451;
+            color: #27243d;
+            cursor: pointer;
+            font: 13px 'Press Start 2P', monospace;
+        }
+        .success-panel .restart-button {
+            width: auto;
+            margin: 14px auto 0;
+            padding: 9px 14px;
+            background: #fff6db;
+            font-size: 10px;
+        }
+        @media (max-width: 700px) {
+            .game-frame { padding: 8px; }
+            .hud { font-size: 9px; }
+            .hud-group { gap: 10px; }
+        }
+    </style>
+</head>
+<body>
+    <section class="start-menu" id="startMenu" aria-label="Game start menu">
+        <div class="start-menu-panel">
+            <h1>The Math Game</h1>
+            <button id="continueButton" type="button">Continue where I left off</button>
+            <button id="firstLevelButton" type="button">Go to first level</button>
+            <select id="levelSelect" aria-label="Choose level"></select>
+            <button id="chooseLevelButton" type="button">Choose level</button>
+        </div>
+    </section>
+    <main class="page">
+        <section class="game-frame" aria-label="Retro Pixel Quest game">
+            <div class="hud">
+                <div class="hud-group">
+                    <span>SCORE <strong id="score">0000</strong></span>
+                    <span>WORLD <strong id="level">1-1</strong></span>
+                </div>
+                <button class="exit-button" id="exitButton" type="button">Exit</button>
+                <div class="hud-group">
+                    <span>KEYS <strong id="keys">0</strong></span>
+                    <span>LIVES <strong id="lives">3</strong></span>
+                </div>
+            </div>
+            <div class="screen">
+                <canvas id="gameCanvas" aria-label="Platform game canvas"></canvas>
+                <div class="message" id="message"></div>
+                <form class="math-panel" id="mathPanel">
+                    <h2>BOX BONUS</h2>
+                    <div class="math-question" id="mathQuestion"></div>
+                    <input id="mathAnswer" type="text" inputmode="decimal" autocomplete="off" aria-label="Math answer" required>
+                    <button type="submit">ANSWER</button>
+                </form>
+                <div class="success-fade" id="successFade"></div>
+                <div class="success-panel" id="successPanel">
+                    <h2>Good Job You Passed the Game</h2>
+                    <button id="nextWorldButton" type="button">Next World</button>
+                    <button class="restart-button" id="restartButton" type="button">Restart</button>
+                </div>
+            </div>
+        </section>
+    </main>
+    <script src="Math Game.js?v=48"></script>
+</body>
+</html>
