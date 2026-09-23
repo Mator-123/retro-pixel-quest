@@ -10,6 +10,7 @@ const mathQuestion = document.getElementById('mathQuestion');
 const mathAnswer = document.getElementById('mathAnswer');
 const successFade = document.getElementById('successFade');
 const successPanel = document.getElementById('successPanel');
+const successTitle = document.getElementById('successTitle');
 const nextWorldButton = document.getElementById('nextWorldButton');
 const restartButton = document.getElementById('restartButton');
 const startMenu = document.getElementById('startMenu');
@@ -78,7 +79,7 @@ const enemies = [
 	{ x: 1700, spawnX: 1700, y: 425, width: 30, height: 45, start: 1530, end: 2010, direction: 1 }
 ];
 
-function buildLevel(level) {
+function buildLevel(level, secret = false) {
 	let seed = level * 7919;
 	const random = () => {
 		seed = (seed * 1664525 + 1013904223) >>> 0;
@@ -146,14 +147,21 @@ function buildLevel(level) {
 			height: 45,
 			start,
 			end,
-			direction: (level + index) % 2 === 0 ? -1 : 1
+			direction: (level + index) % 2 === 0 ? -1 : 1,
+			speed: secret ? 1.7 : 1.1
 		});
 	});
-	if (level % 3 === 0) {
+	if (level % 3 === 0 || secret) {
 		const start = 1100;
 		const end = 1360;
 		const spawnX = randomBetween(start + 20, end - 20);
-		enemies.push({ x: spawnX, spawnX, y: 425, width: 30, height: 45, start, end, direction: -1 });
+		enemies.push({ x: spawnX, spawnX, y: 425, width: 30, height: 45, start, end, direction: -1, speed: secret ? 1.7 : 1.1 });
+	}
+	if (secret) {
+		const start = 1950;
+		const end = 2290;
+		const spawnX = randomBetween(start + 20, end - 20);
+		enemies.push({ x: spawnX, spawnX, y: 425, width: 30, height: 45, start, end, direction: 1, speed: 1.7 });
 	}
 }
 
@@ -164,8 +172,10 @@ let keysCollected = 0;
 let gameState = 'menu';
 let lastTime = 0;
 let activeChallenge = null;
+let activeBox = null;
 let unlockElapsed = 0;
 let worldNumber = 1;
+let secretLevel = 0;
 const totalWorlds = 100;
 
 for (let level = 1; level <= totalWorlds; level += 1) {
@@ -179,21 +189,29 @@ buildLevel(worldNumber);
 
 function startGame(level) {
 	worldNumber = Math.max(1, Math.min(totalWorlds, level));
-	localStorage.setItem('mathGameLastLevel', String(worldNumber));
+	secretLevel = 0;
+	saveProgress();
 	resetGame();
 	startMenu.classList.add('hidden');
 }
 
+function saveProgress() {
+	localStorage.setItem('mathGameProgress', JSON.stringify({ worldNumber, secretLevel }));
+}
+
 continueButton.addEventListener('click', () => {
-	const savedLevel = Number(localStorage.getItem('mathGameLastLevel')) || 1;
-	startGame(savedLevel);
+	const savedProgress = JSON.parse(localStorage.getItem('mathGameProgress') || '{}');
+	worldNumber = Math.max(1, Math.min(totalWorlds, Number(savedProgress.worldNumber) || 1));
+	secretLevel = Math.max(0, Number(savedProgress.secretLevel) || 0);
+	resetGame();
+	startMenu.classList.add('hidden');
 });
 
 firstLevelButton.addEventListener('click', () => startGame(1));
 chooseLevelButton.addEventListener('click', () => startGame(Number(levelSelect.value)));
 
 exitButton.addEventListener('click', () => {
-	localStorage.setItem('mathGameLastLevel', String(worldNumber));
+	saveProgress();
 	gameState = 'menu';
 	message.classList.remove('visible');
 	mathPanel.classList.remove('visible');
@@ -244,7 +262,7 @@ function resetGame() {
 	lives = 3;
 	keysCollected = 0;
 	gameState = 'playing';
-	buildLevel(worldNumber);
+	buildLevel(worldNumber + secretLevel * totalWorlds, secretLevel > 0);
 	resetPlayer();
 	message.classList.remove('visible');
 	mathPanel.classList.remove('visible');
@@ -252,6 +270,7 @@ function resetGame() {
 	successFade.style.opacity = '0';
 	successPanel.classList.remove('visible');
 	activeChallenge = null;
+	activeBox = null;
 	unlockElapsed = 0;
 	updateHud();
 }
@@ -273,25 +292,29 @@ function updateHud() {
 	scoreLabel.textContent = String(score).padStart(4, '0');
 	livesLabel.textContent = lives;
 	keysLabel.textContent = keysCollected;
-	levelLabel.textContent = gameState === 'success' ? 'CLEAR' : `${worldNumber}-1`;
+	levelLabel.textContent = gameState === 'success'
+		? 'CLEAR'
+		: secretLevel > 0 ? `1-${secretLevel + 1}` : `${worldNumber}-1`;
 }
 
 function createMathChallenge() {
 	const type = Math.floor(Math.random() * 3);
 	if (type === 0) {
-		const denominator = 2 + Math.floor(Math.random() * 9);
+		const denominator = secretLevel > 0 ? 3 + Math.floor(Math.random() * 18) : 2 + Math.floor(Math.random() * 9);
 		const first = 1 + Math.floor(Math.random() * (denominator - 1));
-		const second = denominator - first;
-		return { text: `${first}/${denominator} + ${second}/${denominator}`, answer: 1 };
+		const second = 1 + Math.floor(Math.random() * (denominator - 1));
+		return { text: `${first}/${denominator} + ${second}/${denominator}`, answer: (first + second) / denominator };
 	}
-	const first = 1 + Math.floor(Math.random() * 12);
-	const second = 1 + Math.floor(Math.random() * 12);
+	const limit = secretLevel > 0 ? 20 : 12;
+	const first = 1 + Math.floor(Math.random() * limit);
+	const second = 1 + Math.floor(Math.random() * limit);
 	if (type === 1) return { text: `${first} x ${second}`, answer: first * second };
 	return { text: `${first * second} / ${first}`, answer: second };
 }
 
-function openMathChallenge() {
+function openMathChallenge(box) {
 	activeChallenge = createMathChallenge();
+	activeBox = box;
 	mathQuestion.textContent = activeChallenge.text;
 	mathAnswer.value = '';
 	gameState = 'math';
@@ -314,13 +337,26 @@ function parseAnswer(value) {
 function finishMathChallenge() {
 	const answer = parseAnswer(mathAnswer.value);
 	if (answer === activeChallenge.answer) {
+		activeBox.used = true;
 		keysCollected = Math.min(3, keysCollected + 1);
 		score += 100;
 		updateHud();
+	} else {
+		lives -= 1;
+		if (lives <= 0) {
+			gameState = 'lost';
+			message.textContent = 'GAME OVER - PRESS R OR JUMP';
+			message.classList.add('visible');
+		} else {
+			resetPlayer();
+			gameState = 'playing';
+		}
+		updateHud();
 	}
 	activeChallenge = null;
+	activeBox = null;
 	mathPanel.classList.remove('visible');
-	gameState = 'playing';
+	if (lives > 0) gameState = 'playing';
 }
 
 function startUnlockSequence() {
@@ -333,6 +369,9 @@ function startUnlockSequence() {
 
 function finishUnlockSequence() {
 	gameState = 'success';
+	successTitle.textContent = worldNumber === totalWorlds && secretLevel === 0
+		? "You're DEFINITELY a CHEATER!!!"
+		: 'Good Job You Passed the Game';
 	successFade.classList.add('visible');
 	successFade.style.opacity = '1';
 	successPanel.classList.add('visible');
@@ -346,8 +385,12 @@ mathPanel.addEventListener('submit', event => {
 
 restartButton.addEventListener('click', resetGame);
 nextWorldButton.addEventListener('click', () => {
-	worldNumber = Math.min(totalWorlds, worldNumber + 1);
-	localStorage.setItem('mathGameLastLevel', String(worldNumber));
+	if (secretLevel > 0 || worldNumber === totalWorlds) {
+		secretLevel += 1;
+	} else {
+		worldNumber += 1;
+	}
+	saveProgress();
 	resetGame();
 });
 
@@ -391,14 +434,13 @@ function update(delta) {
 		const hittingFromBelow = player.velocityY < 0 && player.y < box.y + box.size &&
 			player.y + player.height > box.y && player.x + player.width > box.x && player.x < box.x + box.size;
 		if (!box.used && hittingFromBelow && intersects(player, boxHitbox)) {
-			box.used = true;
 			player.velocityY = 0;
-			openMathChallenge();
+			openMathChallenge(box);
 		}
 	});
 
 	enemies.forEach(enemy => {
-		enemy.x += enemy.direction * 1.1;
+		enemy.x += enemy.direction * enemy.speed;
 		if (enemy.x <= enemy.start || enemy.x >= enemy.end) enemy.direction *= -1;
 		if (intersects(player, enemy)) {
 			if (player.velocityY > 0 && player.y + player.height - enemy.y < 20) {
